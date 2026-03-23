@@ -3,3 +3,4 @@ uvicorn[standard]
 httpx
 anthropic
 pydantic
+aiofiles
