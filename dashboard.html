@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Temperature — Performer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #1e1e1e;
+    --accent: #c8f03c;
+    --accent-dim: rgba(200, 240, 60, 0.12);
+    --text: #f0f0f0;
+    --muted: #444;
+    --danger: #ff4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,240,60,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,240,60,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .header-label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .status-dot.waiting { background: var(--muted); }
+  .status-dot.polling { background: #f0c040; animation: pulse 1.2s infinite; }
+  .status-dot.live    { background: var(--accent); animation: pulse 1.2s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Main reveal card */
+  .reveal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 48px 40px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: border-color 0.4s;
+  }
+
+  .reveal-card.has-data {
+    border-color: rgba(200, 240, 60, 0.3);
+  }
+
+  .reveal-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.6s;
+  }
+  .reveal-card.has-data::after { opacity: 1; }
+
+  /* Waiting state */
+  .waiting-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .waiting-icon {
+    font-size: 32px;
+    opacity: 0.2;
+    animation: breathe 3s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.15; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(1.05); }
+  }
+
+  .waiting-text {
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* Result state */
+  .result-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    animation: revealIn 0.5s ease forwards;
+  }
+
+  @keyframes revealIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .place-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(48px, 12vw, 80px);
+    letter-spacing: 0.04em;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .country-name {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: -4px;
+  }
+
+  .divider {
+    width: 32px;
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  .temperature {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(72px, 18vw, 120px);
+    color: var(--accent);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .temp-unit {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+    margin-top: -8px;
+  }
+
+  /* Meta row */
+  .meta-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .meta-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .meta-value {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  #raw-query {
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn {
+    flex: 1;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .btn-reset:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: rgba(255,68,68,0.08);
+  }
+
+  /* Config panel */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .config-panel input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 3px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .config-panel input:focus { border-color: var(--accent); }
+  .config-panel input::placeholder { color: var(--muted); }
+
+  .config-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* Flash animation when new data arrives */
+  @keyframes flash {
+    0%   { background: var(--accent-dim); }
+    100% { background: var(--surface); }
+  }
+  .flash { animation: flash 0.8s ease forwards; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <span class="header-label">Temperature — Performer View</span>
+    <div class="status-dot waiting" id="status-dot"></div>
+  </div>
+
+  <!-- Main reveal card -->
+  <div class="reveal-card" id="reveal-card">
+    <div class="waiting-state" id="waiting-state">
+      <div class="waiting-icon">◎</div>
+      <div class="waiting-text">Waiting for spectator…</div>
+    </div>
+    <div class="result-state" id="result-state">
+      <div class="place-name" id="place-name">—</div>
+      <div class="country-name" id="country-name"></div>
+      <div class="divider"></div>
+      <div class="temperature" id="temperature">—</div>
+      <div class="temp-unit">degrees fahrenheit</div>
+    </div>
+  </div>
+
+  <!-- Meta: raw query -->
+  <div class="meta-row">
+    <span class="meta-label">Raw query</span>
+    <span class="meta-value" id="raw-query">—</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-reset" onclick="resetEffect()">↺ Reset</button>
+    <button class="btn" onclick="testEffect()">⚡ Test</button>
+  </div>
+
+</div>
+
+<script>
+  let lastPlace = null;
+
+  function setStatus(state) {
+    const dot = document.getElementById('status-dot');
+    dot.className = 'status-dot ' + state;
+  }
+
+  function showResult(data) {
+    const card = document.getElementById('reveal-card');
+    document.getElementById('waiting-state').style.display = 'none';
+    document.getElementById('result-state').style.display = 'flex';
+    document.getElementById('place-name').textContent = data.place;
+    document.getElementById('country-name').textContent = data.country || '';
+    document.getElementById('temperature').textContent = data.temperature_f + '°';
+    document.getElementById('raw-query').textContent = data.raw_query || '—';
+    card.classList.add('has-data');
+    card.classList.remove('flash');
+    void card.offsetWidth;
+    card.classList.add('flash');
+    setStatus('live');
+  }
+
+  function showWaiting() {
+    document.getElementById('waiting-state').style.display = 'flex';
+    document.getElementById('result-state').style.display = 'none';
+    document.getElementById('raw-query').textContent = '—';
+    document.getElementById('reveal-card').classList.remove('has-data');
+    lastPlace = null;
+    setStatus('polling');
+  }
+
+  async function poll() {
+    try {
+      const resp = await fetch('/poll');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.ready && data.place && data.place !== lastPlace) {
+        lastPlace = data.place;
+        showResult(data);
+      }
+    } catch (e) {}
+  }
+
+  setInterval(poll, 1500);
+  setStatus('polling');
+
+  async function resetEffect() {
+    try { await fetch('/reset', { method: 'DELETE' }); } catch(e) {}
+    showWaiting();
+  }
+
+  async function testEffect() {
+    showResult({
+      place: 'Tokyo',
+      country: 'Japan',
+      temperature_f: 72.3,
+      raw_query: 'What is the temperature in Tokyo',
+    });
+  }
+</script>
+</body>
+</html>
